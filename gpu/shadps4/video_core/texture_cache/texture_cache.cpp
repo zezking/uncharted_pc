@@ -3,6 +3,9 @@
 
 #include <xxhash.h>
 #include <cstdio>
+#include <cstring>
+#include <dirent.h>
+#include <mutex>
 #include <unordered_set>
 
 #include "bbport_toggles.h"
@@ -846,10 +849,81 @@ void TextureCache::RefreshImage(Image& image) {
     for (auto& copy : image_copies) {
         copy.bufferOffset += offset;
     }
+    /* BB_TEXREPLACE=dir: replace uploads whose guest address has <16-hex-addr>.urpl
+     * (magic 'URPL', u32 w, u32 h, then tiled RGBA8888 guest-format bytes) - UI texture
+     * modding. Dims must match the upload; the replacement is written into guest memory
+     * so later reads and re-uploads see it too. */
+    if (const char* trdir = std::getenv("BB_TEXREPLACE")) {
+        if (trdir[0]) {
+            static std::unordered_map<VAddr, std::vector<u8>> replace;
+            static std::once_flag replace_once;
+            std::call_once(replace_once, [&] {
+                if (DIR* dp = opendir(trdir)) {
+                    while (dirent* de = readdir(dp)) {
+                        const char* name = de->d_name;
+                        const size_t len = strlen(name);
+                        if (len != 21 || strcmp(name + 16, ".urpl") != 0) continue;
+                        VAddr addr = 0;
+                        for (int i = 0; i < 16; ++i) {
+                            const char c = name[i];
+                            VAddr v = (c >= '0' && c <= '9') ? c - '0'
+                                    : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+                                    : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : 99;
+                            if (v == 99) { addr = VAddr(-1); break; }
+                            addr = (addr << 4) | v;
+                        }
+                        if (addr == VAddr(-1)) continue;
+                        char path[512];
+                        snprintf(path, sizeof path, "%s/%s", trdir, name);
+                        FILE* f = fopen(path, "rb");
+                        if (!f) continue;
+                        u8 hdr[12];
+                        if (fread(hdr, 1, 12, f) != 12 || memcmp(hdr, "URPL", 4) != 0) {
+                            fclose(f); continue;
+                        }
+                        u32 w, h;
+                        memcpy(&w, hdr + 4, 4);
+                        memcpy(&h, hdr + 8, 4);
+                        std::vector<u8> data(12 + w * h * 4);
+                        memcpy(data.data(), hdr, 12);
+                        if (fread(data.data() + 12, 1, data.size() - 12, f) == data.size() - 12)
+                            replace.emplace(addr, std::move(data));
+                        fclose(f);
+                    }
+                    closedir(dp);
+                    printf("TexReplace: %zu replacement(s) loaded from %s\n", replace.size(), trdir);
+                }
+            });
+            if (auto it = replace.find(image.info.guest_address); it != replace.end()) {
+                const u32 tw = image.info.size.width, th = image.info.size.height;
+                u32 w, h;
+                memcpy(&w, it->second.data() + 4, 4);
+                memcpy(&h, it->second.data() + 8, 4);
+                if (w == tw && h == th && image.info.guest_size == it->second.size() - 12) {
+                    Core::Memory::Instance()->TryWriteBacking(
+                        (void*)image.info.guest_address, it->second.data() + 12,
+                        it->second.size() - 12);
+                    printf("TexReplace: patched upload at %016llx (%ux%u)\n",
+                           (unsigned long long)image.info.guest_address, tw, th);
+                } else {
+                    printf("TexReplace: dims/size mismatch at %016llx: upload %ux%u size=%zu want %ux%u size=%zu\n",
+                           (unsigned long long)image.info.guest_address, tw, th,
+                           (size_t)image.info.guest_size, w, h, (size_t)it->second.size() - 12);
+                }
+            } else if (image.info.size.width == 512 && image.info.size.height == 512 &&
+                       image.info.num_bits == 32) {
+                static int cands;
+                if (cands++ < 8)
+                    printf("TexReplace: unlisted 512x512x32 upload at %016llx fmt=%d\n",
+                           (unsigned long long)image.info.guest_address,
+                           (int)image.info.pixel_format);
+            }
+        }
+    }
     /* BB_TEXDUMP=dir: dump 2D uploads (64..1024) once per guest address - texture modding PoC. */
     if (const char* td = std::getenv("BB_TEXDUMP")) {
         const u32 tw = image.info.size.width, th = image.info.size.height;
-        if (!image.info.props.is_volume && tw >= 64 && tw <= 1024 && th >= 32 && th <= 1024) {
+        if (!image.info.props.is_volume && tw >= 32 && tw <= 4096 && th >= 16 && th <= 4096) {
             static std::unordered_set<VAddr> dumped;
             if (dumped.insert(image.info.guest_address).second) {
                 char path[512];
