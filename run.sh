@@ -38,6 +38,22 @@ export BB_VELOCITY_PS="${BB_VELOCITY_PS:-f4b18264}"
 export BB_UPSCALE_BEFORE_CS="${BB_UPSCALE_BEFORE_CS:-aec539f0}"
 export BB_HUDLESS_PS="${BB_HUDLESS_PS:-484cdbf5}"
 export BB_LOADEXEC_FILE="$OUT_ROOT/loadexec.txt"
+# UI texture replacements (BB_TEXREPLACE): <16-hex-guest-addr>.urpl files applied at upload.
+if [ -d "$PORT/mods/texreplace" ]; then
+    export BB_TEXREPLACE="${BB_TEXREPLACE:-$PORT/mods/texreplace}"
+fi
+
+# Loose-file mods (scripts/mods.py): $GAME becomes a private symlink overlay of
+# the game plus every enabled mod in $PORT/mods (mods.json decides order).
+original_game=$GAME
+GAME=$(python3 "$PORT/scripts/mods.py" "$GAME" --out "$OUT_ROOT" \
+    --mods-dir "${BB_MODS_DIR:-$PORT/mods}" --config "${BB_MODS_CONFIG:-$PORT/mods.json}" \
+    --enabled "${BB_MODS_ENABLED:-1}") || exit 1
+export BB_GAME_DIR="$GAME" BB_MODS_DIR="${BB_MODS_DIR:-$PORT/mods}"
+if [ "$GAME" != "$(realpath "$original_game")" ]; then
+    mod_game=$GAME
+    trap 'python3 -c "import shutil,sys; shutil.rmtree(sys.argv[1], ignore_errors=True)" "$mod_game"' EXIT
+fi
 
 prepare_all() {
     echo "Preparando $EXE ..."

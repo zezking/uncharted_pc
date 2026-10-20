@@ -13,6 +13,9 @@ import tempfile
 GAME_FOLDERS = {'action', 'chr', 'event', 'facegen', 'font', 'map', 'menu', 'movie', 'msg', 'mtd',
                 'obj', 'other', 'param', 'paramdef', 'parts', 'remo', 'script', 'sfx', 'shader',
                 'sound'}
+# The Uncharted dump (Image0) has these where a FromSoftware game has dvdroot_ps4: a mod made
+# of them lands directly in the game dir, without the dvdroot_ps4 prefix.
+UCONTENT_FOLDERS = {'u1data', 'u2data', 'u3data', 'shareddata'}
 
 
 def child(folder, name):
@@ -29,8 +32,9 @@ def content_root(folder):
     """(root, prefix): where a mod's files are and the game path they go to, or None.
 
     Accepted layouts: <mod>/dvdroot_ps4, <mod>/app0/dvdroot_ps4, <mod>/CUSA03173/dvdroot_ps4,
-    one wrapper folder around any of these (an archive extracted into a folder of its name), and
-    the game's folders without dvdroot_ps4 (<mod>/chr, <mod>/parts, ...)."""
+    one wrapper folder around any of these (an archive extracted into a folder of its name),
+    the game's folders without dvdroot_ps4 (<mod>/chr, <mod>/parts, ...), and the Uncharted
+    dump's content folders (<mod>/u1data, <mod>/u2data, ...)."""
     folder = Path(folder)
     if not folder.is_dir():
         return None
@@ -41,6 +45,8 @@ def content_root(folder):
             return base, ''
     entries = [e for e in folder.iterdir() if not e.name.startswith('.')]
     folders = [e for e in entries if e.is_dir()]
+    if folders and all(e.name.casefold() in UCONTENT_FOLDERS for e in folders):
+        return folder, ''
     if folders and all(e.name.casefold() in GAME_FOLDERS for e in folders):
         return folder, 'dvdroot_ps4'
     if len(folders) == 1 and not [e for e in entries if e.is_file() and
@@ -92,10 +98,12 @@ def mod_files(folder):
             relative = Path(prefix) / source.relative_to(root) if prefix else source.relative_to(root)
             # Readme/metadata stay outside the mounted game. This loader handles assets;
             # executable patches use the existing patch compiler, with address validation.
-            if relative.parts[0].casefold() != 'dvdroot_ps4':
-                if relative.parts[0].casefold() in ('eboot.bin', 'sce_module', 'sce_sys'):
+            head = relative.parts[0].casefold()
+            if head != 'dvdroot_ps4':
+                if head in ('eboot.bin', 'sce_module', 'sce_sys'):
                     raise ValueError(f'Executable/system replacement is unsupported: {source}')
-                continue
+                if head not in UCONTENT_FOLDERS:
+                    continue
             if not source.is_file():
                 raise ValueError(f'Not a regular mod file: {source}')
             yield relative, source
