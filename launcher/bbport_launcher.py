@@ -29,7 +29,7 @@ from patches import external_patches  # noqa: E402
 # Packaged (AppImage): generated files, saves and bbport.ini live in BB_DATA_DIR.
 PACKAGED = bool(os.environ.get("BB_PREBUILT"))
 DATA_DIR = Path(os.environ.get("BB_DATA_DIR", PORT_DIR))
-CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "bbport-launcher"
+CONFIG_DIR = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "uncharted-launcher"
 CONFIG_FILE = CONFIG_DIR / "settings.json"
 MAX_LOG_LINES = 5000
 
@@ -64,10 +64,16 @@ LANGUAGES = [("Английский", "1"), ("Русский", "8"), ("Япон�
              ("Испанский", "3"), ("Немецкий", "4"), ("Итальянский", "5")]
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
 READBACKS = [("Relaxed (по умолчанию)", ""), ("Выключены", "0"), ("Precise", "2")]
+# The three games of the collection (run.sh --exe): the launcher passes the choice as BB_EXE.
+GAMES = [("Uncharted 1: Drake's Fortune", "u1"), ("Uncharted 2: Among Thieves", "u2"),
+         ("Uncharted 3: Drake's Deception", "u3")]
+VBLANKS = [("60 Гц (как на PS4)", "60"), ("120 Гц", "120")]
 
 DEFAULTS = {
     "ui_language": "",
-    "game_dir": "" if PACKAGED else str(PORT_DIR.parent / "CUSA03173"),
+    "game_dir": "" if PACKAGED else str(PORT_DIR.parent / "game/CUSA02320/Image0"),
+    "exe": "u1",
+    "vblank": "60",
     "user_dir": "",
     "mods_dir": "",
     "mods_enabled": True,
@@ -162,6 +168,8 @@ def game_environment(s):
     """Environment for run.sh from the launcher settings."""
     env = dict(os.environ)
     env["BB_GAME_DIR"] = str(Path(s["game_dir"]).expanduser())
+    env["BB_EXE"] = s.get("exe") or "u1"
+    env["BB_VBLANK_HZ"] = s.get("vblank") or "60"
     if s["user_dir"]:
         env["BB_USER_DIR"] = s["user_dir"]
     env["BB_MODS_DIR"] = str(Path(s.get("mods_dir") or DATA_DIR / "mods").expanduser())
@@ -246,7 +254,7 @@ class FolderList:
 
 class LauncherWindow(Adw.ApplicationWindow):
     def __init__(self, app):
-        super().__init__(application=app, title="Bloodborne")
+        super().__init__(application=app, title="Uncharted: The Nathan Drake Collection")
         self.set_default_size(760, 820)
         self.settings = load_settings()
         set_language(self.settings.get("ui_language", ""))
@@ -304,7 +312,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         page.add(launcher)
 
         game = Adw.PreferencesGroup(title=tr("Игра"))
-        self.game_row = Adw.ActionRow(title=tr("Папка игры (CUSA03173)"))
+        self.game_select_row = combo_row(tr("Запуск игры"), None, GAMES, self.settings.get("exe", "u1"))
+        game.add(self.game_select_row)
+        self.vblank_row = combo_row(tr("Частота кадров"), None, VBLANKS, str(self.settings.get("vblank", "60")))
+        game.add(self.vblank_row)
+        self.game_row = Adw.ActionRow(title=tr("Папка игры (CUSA02320)"))
         self.game_status = Gtk.Image()
         self.game_row.add_suffix(self.game_status)
         self.game_row.add_suffix(flat_button("folder-open-symbolic", tr("Выбрать папку с eboot.bin"),
@@ -570,6 +582,8 @@ class LauncherWindow(Adw.ApplicationWindow):
 
     def store(self):
         s = self.settings
+        s["exe"] = combo_value(self.game_select_row)
+        s["vblank"] = combo_value(self.vblank_row)
         s["language"] = combo_value(self.language_row)
         s["fullscreen"] = self.fullscreen_row.get_active()
         s["present_mode"] = combo_value(self.present_row)
@@ -812,7 +826,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
 class LauncherApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="io.github.bbport.Launcher",
+        super().__init__(application_id="io.github.uncharted.Launcher",
                          flags=Gio.ApplicationFlags.DEFAULT_FLAGS)
 
     def do_activate(self):
