@@ -143,6 +143,11 @@ EN = {
     "Слои валидации Vulkan": "Vulkan validation layers",
     "Сильно замедляет": "Much slower",
     "Доп. переменные (ИМЯ=значение через пробел)": "Extra variables (NAME=value, space-separated)",
+    # Uncharted launcher additions
+    "Запуск игры": "Game selection",
+    "Папка игры (CUSA02320)": "Game folder (CUSA02320)",
+    "60 Гц (как на PS4)": "60 Hz (like PS4)",
+    "120 Гц": "120 Hz",
 }
 
 
