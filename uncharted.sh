@@ -26,7 +26,7 @@ if [[ -f $CONFIG ]]; then
 else
     export BB_EXE="${BB_EXE:-${1:-u1}}"
 fi
-case "$1" in u1|u2|u3) shift;; esac
+case "${1:-}" in u1|u2|u3) shift;; esac
 
 cd "$PORT"
 exec ./run.sh "$@"
