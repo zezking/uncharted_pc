@@ -843,12 +843,6 @@ void TextureCache::RefreshImage(Image& image) {
 
     scheduler.EndRendering();
 
-    const auto [in_buffer, in_offset] =
-        buffer_cache.ObtainBufferForImage(image.info.guest_address, image.info.guest_size);
-    const auto [buffer, offset] = tile_manager.DetileImage(in_buffer, in_offset, image.info);
-    for (auto& copy : image_copies) {
-        copy.bufferOffset += offset;
-    }
     /* BB_TEXREPLACE=dir: replace uploads whose guest address has <16-hex-addr>.urpl
      * (magic 'URPL', u32 w, u32 h, then tiled RGBA8888 guest-format bytes) - UI texture
      * modding. Dims must match the upload; the replacement is written into guest memory
@@ -919,6 +913,13 @@ void TextureCache::RefreshImage(Image& image) {
                            (int)image.info.pixel_format);
             }
         }
+    }
+
+    const auto [in_buffer, in_offset] =
+        buffer_cache.ObtainBufferForImage(image.info.guest_address, image.info.guest_size);
+    const auto [buffer, offset] = tile_manager.DetileImage(in_buffer, in_offset, image.info);
+    for (auto& copy : image_copies) {
+        copy.bufferOffset += offset;
     }
     /* BB_TEXDUMP=dir: dump 2D uploads (64..1024) once per guest address - texture modding PoC. */
     if (const char* td = std::getenv("BB_TEXDUMP")) {
