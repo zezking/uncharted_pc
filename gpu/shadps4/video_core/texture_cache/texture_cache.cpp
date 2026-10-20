@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <xxhash.h>
+#include <cstdio>
+#include <unordered_set>
 
 #include "bbport_toggles.h"
 #include "common/assert.h"
@@ -843,6 +845,39 @@ void TextureCache::RefreshImage(Image& image) {
     const auto [buffer, offset] = tile_manager.DetileImage(in_buffer, in_offset, image.info);
     for (auto& copy : image_copies) {
         copy.bufferOffset += offset;
+    }
+    /* BB_TEXDUMP=dir: dump 2D uploads (64..1024) once per guest address - texture modding PoC. */
+    if (const char* td = std::getenv("BB_TEXDUMP")) {
+        const u32 tw = image.info.size.width, th = image.info.size.height;
+        if (!image.info.props.is_volume && tw >= 64 && tw <= 1024 && th >= 32 && th <= 1024) {
+            static std::unordered_set<VAddr> dumped;
+            if (dumped.insert(image.info.guest_address).second) {
+                char path[512];
+                snprintf(path, sizeof path,
+                         "%s/tex_%016llx_%ux%u_f%d_m%u.bin", td,
+                         (unsigned long long)image.info.guest_address, tw, th,
+                         (int)image.info.pixel_format, num_mips);
+                FILE* f = fopen(path, "wb");
+                if (f) {
+                    fwrite((const void*)image.info.guest_address, 1, image.info.guest_size, f);
+                    fclose(f);
+                }
+                snprintf(path + strlen(path) - 4, 8, ".txt");
+                f = fopen(path, "w");
+                if (f) {
+                    fprintf(f, "guest=%llx size=%u tiled=%d block=%d bits=%u layers=%u\n",
+                            (unsigned long long)image.info.guest_address, image.info.guest_size,
+                            (int)image.info.props.is_tiled, (int)image.info.props.is_block,
+                            image.info.num_bits, image.info.resources.layers);
+                    for (u32 m = 0; m < num_mips; ++m) {
+                        const auto& mip = image.info.mips_layout[m];
+                        fprintf(f, "mip%u: off=%llu size=%u pitch=%u height=%u\n", m,
+                                (unsigned long long)mip.offset, mip.size, mip.pitch, mip.height);
+                    }
+                    fclose(f);
+                }
+            }
+        }
     }
 
     runtime.UploadImage(&image, buffer, image_copies);
