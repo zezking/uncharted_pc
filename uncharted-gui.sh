@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Uncharted: The Nathan Drake Collection — zenity game picker (bb-gui.sh style).
+# Uncharted: The Nathan Drake Collection — zenity 4 game picker (bb-gui.sh style).
 # Saves the choice to ~/.config/uncharted-launcher/settings.json and starts uncharted.sh.
 set -euo pipefail
 PORT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,12 +18,18 @@ print('hz=%s' % d.get('vblank', 60)); print('fs=%s' % ('true' if d.get('fullscre
 EOF
 )"
 
-ans=$(zenity --forms --title='Uncharted: The Nathan Drake Collection' \
-    --text='Pick a game and options' \
-    --add-list='Game' --list-values="Drake's Fortune (U1)|Among Thieves (U2)|Drake's Deception (U3)|Collection menu (launcher)" \
-    --column-header='Game' \
-    --add-combo='Frame rate' --combo-values="$hz|60|120" \
-    --add-checkbox='Fullscreen' 2>/dev/null) || exit 0
+if ! ans=$(zenity --forms --title='Uncharted: The Nathan Drake Collection' \
+        --text='Pick a game and options' \
+        --add-list='Game|Game' --show-header \
+        --list-values="Drake's Fortune (U1)|Among Thieves (U2)|Drake's Deception (U3)|Collection menu (launcher)" \
+        --add-combo='Frame rate' --combo-values="$hz|60|120" \
+        --add-combo='Display' --combo-values="$([ "$fs" = true ] && echo 'Fullscreen|Windowed' || echo 'Windowed|Fullscreen')"); then
+    rc=$?
+    # 1 = user cancelled; anything else is a real error worth showing
+    [[ $rc -eq 1 ]] && exit 0
+    zenity --error --text="zenity failed (rc=$rc)" 2>/dev/null || true
+    exit 1
+fi
 
 game=$(awk -F'|' '{print $1}' <<<"$ans")
 sel_hz=$(awk -F'|' '{print $2}' <<<"$ans")
@@ -43,7 +49,7 @@ cfg = {}
 try: cfg = json.load(open(sys.argv[1]))
 except Exception: pass
 cfg.update(exe=sys.argv[2], vblank=int(sys.argv[3]),
-           fullscreen=(sys.argv[4].lower() == 'true'))
+           fullscreen=(sys.argv[4].strip().lower() == 'fullscreen'))
 json.dump(cfg, open(sys.argv[1], 'w'), indent=2)
 EOF
 
