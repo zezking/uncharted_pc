@@ -131,7 +131,7 @@ reads; the launcher writes it, and `BB_*` environment variables override it.
 | `live_resolution` | `auto`, `0`, `1` | let the window/resolution follow the video card |
 | `show_fps` | `0`/`1` | on-screen frame rate |
 | `model_lod`, `object_motion` | `0`/`1` | LOD and object motion vectors |
-| `frame_gen`, `frame_gen_multiplier` | `off`/`fsr3`/`dlss`, `2`…`4` | frame interpolation (FSR 3 works on any GPU) |
+| `frame_gen`, `frame_gen_multiplier` | `off`/`fsr3`/`dlss`, `2`…`4` | frame interpolation (FSR 3 works on any GPU; the capture lives in the temporal upscaler, so it needs one) |
 
 Sharpening also applies to **TAA**: the range is 0…1, at 0 (or with the switch
 off) there is no extra pass, RCAS runs on the finished scene before the HUD, and

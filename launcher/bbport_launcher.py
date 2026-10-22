@@ -43,6 +43,9 @@ UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
              ("TAA (нативное сглаживание)", "taa"), ("Выключен", "off")]
 PRESETS = [("Native AA", 0), ("Quality (x1.5)", 1), ("Balanced (x1.7)", 2),
            ("Performance (x2)", 3), ("Ultra Performance (x3)", 4)]
+# bbport.ini "frame_gen": FSR 3.1 interpolation on any GPU (DLSS FG needs the Windows DLL).
+# The capture runs inside the temporal upscaler, so it only works with the upscaler on.
+FRAME_GEN = [("Выкл", "off"), ("FSR 3 (любая видеокарта)", "fsr3")]
 OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"), ("2560×1440", "2560x1440"), ("3840×2160", "3840x2160")]
 # bbport's effect switches (effect_* keys) are Bloodborne XML patches: they never match the
 # Uncharted eboot, so they are not offered here. The port's own tweaks are pattern-matched.
@@ -105,6 +108,7 @@ INI_DEFAULTS = {
     "output_res": "1920x1080",
     "model_lod": "0",
     "live_resolution": "0",
+    "frame_gen": "off",
 }
 
 
@@ -424,6 +428,12 @@ class LauncherWindow(Adw.ApplicationWindow):
             subtitle=tr("Меньше гостинга на персонажах; стоит около 10% FPS"),
             active=self.ini.get("object_motion") == "1")
         upscaler.add(self.motion_row)
+        self.frame_gen_row = combo_row(
+            tr("Генерация кадров"),
+            tr("Удваивает кадры между кадрами игры; работает только с включённым апскейлером "
+               "(FSR или TAA). В игре — Insert / L3+R3."),
+            FRAME_GEN, self.ini.get("frame_gen", "off"))
+        upscaler.add(self.frame_gen_row)
         self.show_fps_row = Adw.SwitchRow(title=tr("Показывать FPS"),
                                           active=self.ini.get("show_fps") == "1")
         upscaler.add(self.show_fps_row)
@@ -555,6 +565,11 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.preset_row.set_sensitive(value not in ("taa", "off"))
         self.sharpen_row.set_sensitive(value != "off")
         self.sharpness_row.set_sensitive(value != "off")
+        if hasattr(self, "frame_gen_row"):
+            self.frame_gen_row.set_sensitive(value != "off")
+            if value == "off":
+                self.frame_gen_row.set_subtitle(
+                    tr("Нужен апскейлер: с «Выключен» генерация кадров не работает"))
         self.upscaler_row.set_subtitle(hint or "")
 
     def update_game_status(self):
@@ -598,6 +613,7 @@ class LauncherWindow(Adw.ApplicationWindow):
             "sharpen": "1" if self.sharpen_row.get_active() else "0",
             "sharpness": f"{self.sharpness_row.get_value():.2f}",
             "object_motion": "1" if self.motion_row.get_active() else "0",
+            "frame_gen": combo_value(self.frame_gen_row),
             "show_fps": "1" if self.show_fps_row.get_active() else "0",
             "output_res": combo_value(self.output_row),
             "model_lod": combo_value(self.lod_row),

@@ -36,8 +36,9 @@ software fallback for smoke tests.
 - **60 Hz or 120 Hz** vblank like/above PS4; higher rates are experimental.
 - **Upscaling**: FSR 4, FSR 4.1.1, FSR 3, TAA, or off — with Native AA / Quality / Balanced /
   Performance / Ultra Performance presets, output resolution and sharpening.
-- **Frame interpolation**: FSR 3.1 (any GPU, 2×) via `BB_FRAME_GEN=fsr3`; not exposed in the
-  launcher yet. DLSS upscaling and DLSS frame generation are Windows-only.
+- **Frame interpolation**: FSR 3.1 (any GPU, 2×) — "Frame generation" in the launcher, or
+  `BB_FRAME_GEN=fsr3`. It needs the upscaler on; DLSS upscaling and DLSS frame generation are
+  Windows-only.
 - **Model detail, RCAS sharpening, object motion vectors** and an FPS cap, all live-applied
   through `bbport.ini` (no restart).
 - **Keyboard, mouse and controller** together, remappable; mouse look in all three games.
@@ -143,7 +144,6 @@ Conventions and details: [`docs/MODS.md`](docs/MODS.md).
 
 - Frame rates above 120 are experimental.
 - DLSS (upscaling and frame generation) is not available in this Linux build; FSR is.
-- The GTK4 launcher exposes upscaling but not frame generation — use `BB_FRAME_GEN=fsr3`.
 - Some effects sharpness/coverage depends on the dump version (1.00 vs 1.02); the pattern-matched
   hooks cover both, watch for the `Callbacks:` lines in the log.
 

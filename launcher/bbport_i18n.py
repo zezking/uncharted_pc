@@ -7,6 +7,16 @@ English otherwise).
 import os
 
 EN = {
+    # Frame generation (bbport.ini frame_gen)
+    "Генерация кадров": "Frame generation",
+    "Выкл": "Off",
+    "FSR 3 (любая видеокарта)": "FSR 3 (any GPU)",
+    "Удваивает кадры между кадрами игры; работает только с включённым апскейлером "
+    "(FSR или TAA). В игре — Insert / L3+R3.":
+        "Doubles the frames between the game's own frames; needs the upscaler on "
+        "(FSR or TAA). In game: Insert / L3+R3.",
+    "Нужен апскейлер: с «Выключен» генерация кадров не работает":
+        "An upscaler is required: frame generation does nothing with it Off",
     # Honest settings page for the Uncharted port (no Bloodborne-only switches)
     "Модели": "Models",
     "Влияет сразу, без перезапуска": "Applies immediately, no restart",
