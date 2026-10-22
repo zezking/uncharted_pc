@@ -7,6 +7,18 @@ English otherwise).
 import os
 
 EN = {
+    # Honest settings page for the Uncharted port (no Bloodborne-only switches)
+    "Модели": "Models",
+    "Влияет сразу, без перезапуска": "Applies immediately, no restart",
+    "Ограничение кадров": "Frame limit",
+    "BB_FPS_LIMIT: 0 — как задано частотой кадров (60/120) "
+    "на странице «Игра»; число задаёт предел вручную":
+        "BB_FPS_LIMIT: 0 follows the frame rate (60/120) chosen on the Game page; "
+        "a number sets a manual cap",
+    "Каждый мод — отдельная папка с u1data/u2data/u3data (или dvdroot_ps4, chr/, parts/). "
+    "При совпадении файлов побеждает мод ниже в списке. Применяется при запуске.":
+        "Each mod is a folder with u1data/u2data/u3data (or dvdroot_ps4, chr/, parts/). "
+        "When files collide the lower mod in the list wins. Applied on launch.",
     # Window, pages, buttons
     "Запустить": "Play",
     "Остановить": "Stop",

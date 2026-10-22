@@ -38,8 +38,8 @@ software fallback for smoke tests.
   Performance / Ultra Performance presets, output resolution and sharpening.
 - **Frame interpolation**: FSR 3.1 (any GPU, 2×) via `BB_FRAME_GEN=fsr3`; not exposed in the
   launcher yet. DLSS upscaling and DLSS frame generation are Windows-only.
-- **Game effects toggled by code patches**: chromatic aberration, depth of field, motion blur,
-  SSAO, the game's own anti-aliasing, dynamic shadows, SSR.
+- **Model detail, RCAS sharpening, object motion vectors** and an FPS cap, all live-applied
+  through `bbport.ini` (no restart).
 - **Keyboard, mouse and controller** together, remappable; mouse look in all three games.
 - **Mods**: loose-file overlay and per-mod texture replacement, `mods.json` decides order and
   which ones are enabled.

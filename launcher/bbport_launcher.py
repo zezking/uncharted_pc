@@ -40,23 +40,20 @@ UPSCALERS = [("FSR 4", "fsr4"), ("FSR 4.1.1", "fsr411"), ("FSR 3", "fsr3"),
 PRESETS = [("Native AA", 0), ("Quality (x1.5)", 1), ("Balanced (x1.7)", 2),
            ("Performance (x2)", 3), ("Ultra Performance (x3)", 4)]
 OUTPUT_RES = [("1280×720 (Steam Deck)", "1280x720"), ("1920×1080", "1920x1080"), ("2560×1440", "2560x1440"), ("3840×2160", "3840x2160")]
-# Game effects (patches applied at start): bbport.ini key, title, default.
-EFFECTS = [
-    ("effect_chromatic_aberration", "Хроматическая аберрация", True),
-    ("effect_dof", "Глубина резкости (DoF)", True),
-    ("effect_motion_blur", "Размытие в движении", True),
-    ("effect_ssao", "Затенение SSAO", True),
-    ("effect_game_aa", "Собственное сглаживание игры", True),
-    ("effect_dynamic_shadows", "Тени от динамических источников", True),
-    ("effect_ssr", "Отражения SSR (не было в игре)", False),
-    ("skip_intro", "Пропуск заставок при запуске", False),
-    ("debug_camera", "Свободная камера (Cross + L3 / Space + Z)", False),
-    ("debug_menu", "Debug menu (левый touchpad / Tab; нужны шрифты)", False),
-]
+# bbport's effect switches (effect_* keys) are Bloodborne XML patches: they never match the
+# Uncharted eboot, so they are not offered here. The port's own tweaks are pattern-matched.
+# The third-party XML patch page is Bloodborne-only for the same reason (see SHOW_PATCHES).
+SHOW_PATCHES = False
 MODEL_LOD = [("Как в игре", "0"), ("Максимальная (-2)", "-2"), ("Ниже (1)", "1"),
              ("Минимальная (2)", "2")]
-FPS_MODES = [("Без ограничения (патч)", "uncap"), ("60", "60"), ("90", "90"),
-             ("30 (как на PS4)", "30")]
+# BB_FPS (a Bloodborne FPS patch selection) is never read by this port; BB_FPS_LIMIT is.
+# Keys the port does not read (bbport's Bloodborne patch switches): dropped from bbport.ini on
+# save instead of being written back, so the file only lists settings that do something.
+INERT_INI_KEYS = {
+    "effect_chromatic_aberration", "effect_dof", "effect_motion_blur", "effect_ssao",
+    "effect_game_aa", "effect_dynamic_shadows", "effect_ssr",
+    "skip_intro", "debug_camera", "debug_menu",
+}
 PRESENT_MODES = [("Mailbox", "Mailbox"), ("FIFO (VSync)", "Fifo"),
                  ("FIFO Relaxed", "FifoRelaxed"), ("Immediate", "Immediate")]
 DRAW_PIPE = [("Авто (8+ потоков)", ""), ("Включён", "1"), ("Выключен (стабильнее)", "0")]
@@ -83,7 +80,6 @@ DEFAULTS = {
     "fullscreen": False,
     "hdr": False,
     "present_mode": "Mailbox",
-    "fps_mode": "uncap",
     "fps_limit": 0,
     "draw_pipe": "",
     "readbacks": "",
@@ -105,7 +101,6 @@ INI_DEFAULTS = {
     "output_res": "1920x1080",
     "model_lod": "0",
     "live_resolution": "0",
-    **{key: "1" if default else "0" for key, _, default in EFFECTS},
 }
 
 
@@ -148,6 +143,8 @@ def save_ini(values, lines):
     for line in lines:
         if "=" in line and not line.lstrip().startswith("#"):
             key = line.split("=", 1)[0].strip()
+            if key in INERT_INI_KEYS:
+                continue
             if key in values:
                 out.append(f"{key}={values[key]}")
                 written.add(key)
@@ -156,7 +153,7 @@ def save_ini(values, lines):
     if not lines:
         out.append("# bbport settings (in-game menu: Insert / L3+R3)")
     for key, value in values.items():
-        if key not in written:
+        if key not in written and key not in INERT_INI_KEYS:
             out.append(f"{key}={value}")
     ini_path().write_text("\n".join(out) + "\n")
 
@@ -183,7 +180,6 @@ def game_environment(s):
     env["BB_PRESENT_MODE"] = s["present_mode"]
     if s["hdr"]:
         env["BB_HDR"] = "1"
-    env["BB_FPS"] = s["fps_mode"]
     if s["fps_limit"] > 0:
         env["BB_FPS_LIMIT"] = str(s["fps_limit"])
     if s["draw_pipe"]:
@@ -345,7 +341,7 @@ class LauncherWindow(Adw.ApplicationWindow):
 
         self.mods_group = Adw.PreferencesGroup(
             title=tr("Моды"), description=tr(
-                "Распакуйте каждый мод в отдельную папку (с dvdroot_ps4 или сразу с chr/, parts/ и т. п.). "
+                "Каждый мод — отдельная папка с u1data/u2data/u3data (или dvdroot_ps4, chr/, parts/). "
                 "При совпадении файлов побеждает мод ниже в списке. Применяется при запуске."))
         self.mods_enabled_row = Adw.SwitchRow(title=tr("Загружать моды"),
                                                active=self.settings["mods_enabled"])
@@ -377,7 +373,10 @@ class LauncherWindow(Adw.ApplicationWindow):
         self.patches_group.add(self.patches_folder_row)
         self.patch_list = FolderList(self.patches_group)
         self.refresh_patches()
-        page.add(self.patches_group)
+        # Bloodborne-format XML only (TitleID/AppVer 01.09): it can never list an Uncharted
+        # patch, so the group stays off the page instead of showing dead switches.
+        if SHOW_PATCHES:
+            page.add(self.patches_group)
 
         screen = Adw.PreferencesGroup(title=tr("Экран"))
         self.output_row = combo_row(tr("Разрешение вывода"),
@@ -426,30 +425,18 @@ class LauncherWindow(Adw.ApplicationWindow):
         upscaler.add(self.show_fps_row)
         page.add(upscaler)
 
-        effects = Adw.PreferencesGroup(title=tr("Эффекты игры"),
-                                       description=tr("Патчи игры, применяются при запуске"))
+        models = Adw.PreferencesGroup(title=tr("Модели"),
+                                      description=tr("Влияет сразу, без перезапуска"))
         self.lod_row = combo_row(tr("Детализация моделей"), None, MODEL_LOD,
                                  self.ini.get("model_lod", "0"))
-        effects.add(self.lod_row)
-        self.effect_rows = {}
-        for key, title, default in EFFECTS:
-            row = Adw.SwitchRow(title=tr(title),
-                                active=self.ini.get(key, "1" if default else "0") == "1")
-            if key == "debug_menu":
-                row.set_subtitle(tr("Установите DbgFont14h.ccm и DbgFont14h.tpf в dvdroot_ps4/font "
-                                    "из мода Nexus #253"))
-            self.effect_rows[key] = row
-            effects.add(row)
-        page.add(effects)
+        models.add(self.lod_row)
+        page.add(models)
 
-        frames = Adw.PreferencesGroup(title=tr("Частота кадров"))
-        self.fps_row = combo_row(tr("Режим"), tr("Какой патч частоты кадров применить к игре"),
-                                 FPS_MODES, self.settings["fps_mode"])
-        frames.add(self.fps_row)
+        frames = Adw.PreferencesGroup(title=tr("Ограничение кадров"))
         self.limit_row = Adw.SpinRow.new_with_range(0, 480, 1)
         self.limit_row.set_title(tr("Ограничение FPS"))
-        self.limit_row.set_subtitle(tr("0 — по частоте экрана (не выше 120 Гц); "
-                                       "укажите число, чтобы ограничить иначе"))
+        self.limit_row.set_subtitle(tr("BB_FPS_LIMIT: 0 — как задано частотой кадров (60/120) "
+                                       "на странице «Игра»; число задаёт предел вручную"))
         self.limit_row.set_value(self.settings["fps_limit"])
         frames.add(self.limit_row)
         page.add(frames)
@@ -589,7 +576,6 @@ class LauncherWindow(Adw.ApplicationWindow):
         s["fullscreen"] = self.fullscreen_row.get_active()
         s["present_mode"] = combo_value(self.present_row)
         s["hdr"] = self.hdr_row.get_active()
-        s["fps_mode"] = combo_value(self.fps_row)
         s["fps_limit"] = int(self.limit_row.get_value())
         s["draw_pipe"] = combo_value(self.pipe_row)
         s["readbacks"] = combo_value(self.readbacks_row)
@@ -612,7 +598,6 @@ class LauncherWindow(Adw.ApplicationWindow):
             "output_res": combo_value(self.output_row),
             "model_lod": combo_value(self.lod_row),
             "live_resolution": combo_value(self.live_row),
-            **{key: "1" if row.get_active() else "0" for key, row in self.effect_rows.items()},
         })
         save_ini(self.ini, self.ini_lines)
         self.ini, self.ini_lines = load_ini()

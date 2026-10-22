@@ -146,9 +146,13 @@ come from bbport (the Bloodborne port) and are kept for compatibility: they
 accept shadPS4/GoldHEN XML patch files whose `TitleID` and
 `Metadata AppVer="01.09"` match Bloodborne. The bundled
 `patches/Bloodborne.xml` targets Bloodborne's `eboot.bin`, so **nothing in this
-system applies to the Uncharted dumps** (`CUSA02320`, app versions 01.00/01.02)
-— the page simply stays empty. The launcher's effect switches (`effect_*` keys)
-map to patch names from that same file, so they do not change Uncharted either.
+system applies to the Uncharted dumps** (`CUSA02320`, app versions 01.00/01.02).
+
+Because of that the launcher does not offer those controls at all: the
+"third-party patches" page and the old `effect_*` switches (chromatic
+aberration, DoF, motion blur, SSAO, game AA, dynamic shadows, SSR, intro skip,
+debug camera/menu) are gone, and the launcher removes those keys from
+`bbport.ini` when it saves, so the file only lists settings the port reads.
 
 Uncharted's own runtime changes live in the port instead: the frame rate, the
 upscaler/frame-interpolation setup and the mouse hooks are built-in patches that
