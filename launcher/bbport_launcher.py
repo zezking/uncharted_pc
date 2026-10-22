@@ -65,7 +65,8 @@ LANGUAGES = [("Английский", "1"), ("Русский", "8"), ("Япон�
 LIVE_RESOLUTION = [("Авто (по видеокарте)", "auto"), ("Выключена (быстрее)", "0"), ("Включена", "1")]
 READBACKS = [("Relaxed (по умолчанию)", ""), ("Выключены", "0"), ("Precise", "2")]
 # The three games of the collection (run.sh --exe): the launcher passes the choice as BB_EXE.
-GAMES = [("Uncharted 1: Drake's Fortune", "u1"), ("Uncharted 2: Among Thieves", "u2"),
+GAMES = [("Collection (game selection)", "collection"),
+         ("Uncharted 1: Drake's Fortune", "u1"), ("Uncharted 2: Among Thieves", "u2"),
          ("Uncharted 3: Drake's Deception", "u3")]
 VBLANKS = [("60 Гц (как на PS4)", "60"), ("120 Гц", "120")]
 

@@ -843,49 +843,70 @@ void TextureCache::RefreshImage(Image& image) {
 
     scheduler.EndRendering();
 
-    /* BB_TEXREPLACE=dir: replace uploads whose guest address has <16-hex-addr>.urpl
+    /* BB_TEXREPLACE=dir[:dir...]: replace uploads whose guest address has <16-hex-addr>.urpl
      * (magic 'URPL', u32 w, u32 h, then tiled RGBA8888 guest-format bytes) - UI texture
      * modding. Dims must match the upload; the replacement is written into guest memory
-     * so later reads and re-uploads see it too. */
+     * so later reads and re-uploads see it too. Multiple ':'-separated directories are
+     * searched in order (later ones win), which lets a game-specific directory extend
+     * the shared one without leaking its textures into the other games. */
     if (const char* trdir = std::getenv("BB_TEXREPLACE")) {
         if (trdir[0]) {
             static std::unordered_map<VAddr, std::vector<u8>> replace;
             static std::once_flag replace_once;
             std::call_once(replace_once, [&] {
-                if (DIR* dp = opendir(trdir)) {
-                    while (dirent* de = readdir(dp)) {
-                        const char* name = de->d_name;
-                        const size_t len = strlen(name);
-                        if (len != 21 || strcmp(name + 16, ".urpl") != 0) continue;
-                        VAddr addr = 0;
-                        for (int i = 0; i < 16; ++i) {
-                            const char c = name[i];
-                            VAddr v = (c >= '0' && c <= '9') ? c - '0'
-                                    : (c >= 'a' && c <= 'f') ? c - 'a' + 10
-                                    : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : 99;
-                            if (v == 99) { addr = VAddr(-1); break; }
-                            addr = (addr << 4) | v;
+                const char* p = trdir;
+                while (p && *p) {
+                    const char* sep = strchr(p, ':');
+                    const std::string dir(p, sep ? size_t(sep - p) : strlen(p));
+                    p = sep ? sep + 1 : nullptr;
+                    if (dir.empty()) continue;
+                    if (DIR* dp = opendir(dir.c_str())) {
+                        while (dirent* de = readdir(dp)) {
+                            const char* name = de->d_name;
+                            const size_t len = strlen(name);
+                            if (len != 21 || strcmp(name + 16, ".urpl") != 0) continue;
+                            VAddr addr = 0;
+                            for (int i = 0; i < 16; ++i) {
+                                const char c = name[i];
+                                VAddr v = (c >= '0' && c <= '9') ? c - '0'
+                                        : (c >= 'a' && c <= 'f') ? c - 'a' + 10
+                                        : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : 99;
+                                if (v == 99) { addr = VAddr(-1); break; }
+                                addr = (addr << 4) | v;
+                            }
+                            if (addr == VAddr(-1)) continue;
+                            std::string path = dir + "/" + name;
+                            FILE* f = fopen(path.c_str(), "rb");
+                            if (!f) continue;
+                            u8 hdr[12];
+                            if (fread(hdr, 1, 12, f) != 12 || memcmp(hdr, "URPL", 4) != 0) {
+                                fclose(f); continue;
+                            }
+                            u32 w, h;
+                            memcpy(&w, hdr + 4, 4);
+                            memcpy(&h, hdr + 8, 4);
+                            std::vector<u8> data(12 + w * h * 4);
+                            memcpy(data.data(), hdr, 12);
+                            if (fread(data.data() + 12, 1, data.size() - 12, f) == data.size() - 12)
+                                replace.insert_or_assign(addr, std::move(data));
+                            fclose(f);
                         }
-                        if (addr == VAddr(-1)) continue;
-                        char path[512];
-                        snprintf(path, sizeof path, "%s/%s", trdir, name);
-                        FILE* f = fopen(path, "rb");
-                        if (!f) continue;
-                        u8 hdr[12];
-                        if (fread(hdr, 1, 12, f) != 12 || memcmp(hdr, "URPL", 4) != 0) {
-                            fclose(f); continue;
-                        }
-                        u32 w, h;
-                        memcpy(&w, hdr + 4, 4);
-                        memcpy(&h, hdr + 8, 4);
-                        std::vector<u8> data(12 + w * h * 4);
-                        memcpy(data.data(), hdr, 12);
-                        if (fread(data.data() + 12, 1, data.size() - 12, f) == data.size() - 12)
-                            replace.emplace(addr, std::move(data));
-                        fclose(f);
+                        closedir(dp);
                     }
-                    closedir(dp);
-                    printf("TexReplace: %zu replacement(s) loaded from %s\n", replace.size(), trdir);
+                }
+                printf("TexReplace: %zu replacement(s) loaded from %s\n", replace.size(), trdir);
+                if (const char* logdir = std::getenv("BB_GPU_USER_DIR"); logdir && logdir[0]) {
+                    std::string log = std::string(logdir) + "/texreplace.log";
+                    if (FILE* lf = fopen(log.c_str(), "a")) {
+                        fprintf(lf, "loaded %zu replacement(s) from %s\n", replace.size(), trdir);
+                        for (const auto& kv : replace) {
+                            u32 rw = 0, rh = 0;
+                            memcpy(&rw, kv.second.data() + 4, 4);
+                            memcpy(&rh, kv.second.data() + 8, 4);
+                            fprintf(lf, "  %016llx %ux%u\n", (unsigned long long)kv.first, rw, rh);
+                        }
+                        fclose(lf);
+                    }
                 }
             });
             if (auto it = replace.find(image.info.guest_address); it != replace.end()) {
@@ -899,6 +920,14 @@ void TextureCache::RefreshImage(Image& image) {
                         it->second.size() - 12);
                     printf("TexReplace: patched upload at %016llx (%ux%u)\n",
                            (unsigned long long)image.info.guest_address, tw, th);
+                    if (const char* logdir = std::getenv("BB_GPU_USER_DIR"); logdir && logdir[0]) {
+                        std::string log = std::string(logdir) + "/texreplace.log";
+                        if (FILE* lf = fopen(log.c_str(), "a")) {
+                            fprintf(lf, "patched %016llx %ux%u\n",
+                                    (unsigned long long)image.info.guest_address, tw, th);
+                            fclose(lf);
+                        }
+                    }
                 } else {
                     printf("TexReplace: dims/size mismatch at %016llx: upload %ux%u size=%zu want %ux%u size=%zu\n",
                            (unsigned long long)image.info.guest_address, tw, th,

@@ -38,9 +38,20 @@ export BB_VELOCITY_PS="${BB_VELOCITY_PS:-f4b18264}"
 export BB_UPSCALE_BEFORE_CS="${BB_UPSCALE_BEFORE_CS:-aec539f0}"
 export BB_HUDLESS_PS="${BB_HUDLESS_PS:-484cdbf5}"
 export BB_LOADEXEC_FILE="$OUT_ROOT/loadexec.txt"
-# UI texture replacements (BB_TEXREPLACE): <16-hex-guest-addr>.urpl files applied at upload.
-if [ -d "$PORT/mods/texreplace" ]; then
-    export BB_TEXREPLACE="${BB_TEXREPLACE:-$PORT/mods/texreplace}"
+# UI texture replacements (BB_TEXREPLACE): <16-hex-guest-addr>.urpl files are written
+# into guest memory when that texture is uploaded. Any mod can ship them in its own
+# <mod>/texreplace/ dir; an optional <mod>/texreplace/<exe> subdir holds keys that must
+# not leak into the other games (searched last, so it wins). BB_MODS_ENABLED=0 turns
+# the whole mod system - overlay and texture replacements - off.
+if [ "${BB_MODS_ENABLED:-1}" != "0" ]; then
+    trdirs=""
+    for d in "$PORT"/mods/*/texreplace; do
+        [ -d "$d" ] || continue
+        trdirs="${trdirs:+$trdirs:}$d"
+        [ -d "$d/${EXE_NAME}" ] && trdirs="$trdirs:$d/${EXE_NAME}"
+    done
+    [ -d "$PORT/mods/texreplace" ] && trdirs="${trdirs:+$trdirs:}$PORT/mods/texreplace"
+    [ -n "$trdirs" ] && export BB_TEXREPLACE="${BB_TEXREPLACE:-$trdirs}"
 fi
 
 # Loose-file mods (scripts/mods.py): $GAME becomes a private symlink overlay of
