@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-2.0-or-later
-"""Bloodborne launcher for the native port (GTK4 / libadwaita).
+"""GTK4 / libadwaita launcher for the Uncharted collection port (adapted from bbport).
 
-Picks the game folder, edits the port's settings (bbport.ini: upscaler, preset, ...) and the
-start-up tweaks passed as environment variables to run.sh, starts and stops the game and shows
-its output. Launcher settings live in ~/.config/bbport-launcher/settings.json.
-Russian and English (bbport_i18n: the Russian text is the key).
+Picks the game folder and the game (u1/u2/u3), edits the port's settings (bbport.ini: upscaler,
+preset, sharpening, frame limit, ...) and the start-up variables passed to uncharted.sh, manages
+the mods folder, starts and stops the game and shows its output. Launcher settings live in
+~/.config/uncharted-launcher/settings.json. Russian and English (bbport_i18n: the Russian text
+is the key).
+
+Only settings this port actually reads are offered: the bbport/Bloodborne XML patch switches and
+the third-party patch page are disabled (see INERT_INI_KEYS / SHOW_PATCHES).
 """
 
 import json
